@@ -35,6 +35,10 @@ const PROXY_URL = (process.env.PROXY_URL || "").trim();
 // Настоящий Chrome вместо bundled Chromium. Incapsula отличает Playwright-запущенный
 // браузер по navigator.webdriver и режет API, поэтому в идеале ставим флаг false.
 const BROWSER_CHANNEL = (process.env.BROWSER_CHANNEL || "chrome").trim();
+// Дополнительные флаги запуска Chrome через пробел. Нужны в контейнере:
+// --no-sandbox (иначе не стартует от root), --disable-dev-shm-usage (/dev/shm в контейнере мал),
+// --renderer-process-limit=1 и лимит кучи режут память на слабом VPS.
+const CHROME_ARGS = (process.env.CHROME_ARGS || "").split(/\s+/).filter(Boolean);
 // Порт отладочного протокола для ручного запуска Chrome (connectOverCDP).
 const CDP_PORT = Number(process.env.CDP_PORT || 9333);
 // Экземпляр Chrome, который уже поднят сам скрипт (убивается в конце).
@@ -95,6 +99,7 @@ async function connectOverRealChrome(headless) {
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-blink-features=AutomationControlled",
+    ...CHROME_ARGS,
     "about:blank",
   ];
   if (headless) args.unshift("--headless=new");

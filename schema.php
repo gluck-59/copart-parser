@@ -2,12 +2,12 @@
 declare(strict_types=1);
 
 /**
- * Общая схема БД copart-parser (lots + subscribers).
+ * Общая схема БД copart-parser (lots + subscribers + seturl_pending).
  *
  * Идемпотентна, вызывается из:
  *   import.php — импорт JSON
  *   notify.php — рассылка новых лотов
- *   public/bot.php — /start и /stop
+ *   public/bot.php — /start, /stop, /seturl
  */
 
 function ensureSchema(PDO $pdo): void
@@ -46,6 +46,14 @@ function ensureSchema(PDO $pdo): void
             first_name  VARCHAR(255) NULL,
             username    VARCHAR(255) NULL,
             subscribed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS seturl_pending (
+            user_id      BIGINT NOT NULL,
+            requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );

@@ -22,6 +22,11 @@ const HELP_TEXT =
     '/start — подписаться на оповещения\n' .
     '/stop — отписаться';
 
+const SETURL_PROMPT =
+    'Установите фильтры на Копарте, запустите поиск и проверьте. Если все ок, скопироуйте ссылку из браузера и вставьте ее сюда.';
+const SETURL_OK = 'Фильтры сохранены, следующая партия лотов прилетит по расписанию.';
+const SETURL_FAIL = 'Что-то пошло не так, пожалуйтесь Глюку.';
+
 function sendText(int $chatId, string $text): void
 {
     apiRequestJson('sendMessage', [
@@ -74,6 +79,103 @@ function unsubscribe(int $chatId): void
     tgLog('отписка user_id=' . $chatId . ($removed ? '' : ' (нет подписки)'));
 }
 
+/** Запоминаем, что от user_id ждём ссылку на поиск Copart. */
+function armSetUrl(int $chatId): void
+{
+    $pdo = db();
+    ensureSchema($pdo);
+
+    $pdo->prepare(
+        'INSERT INTO seturl_pending (user_id) VALUES (?)
+         ON DUPLICATE KEY UPDATE requested_at = CURRENT_TIMESTAMP'
+    )->execute([$chatId]);
+}
+
+function isSetUrlArmed(int $chatId): bool
+{
+    $pdo = db();
+    ensureSchema($pdo);
+
+    $st = $pdo->prepare('SELECT 1 FROM seturl_pending WHERE user_id = ?');
+    $st->execute([$chatId]);
+
+    return (bool) $st->fetchColumn();
+}
+
+function disarmSetUrl(int $chatId): void
+{
+    $pdo = db();
+    ensureSchema($pdo);
+
+    $st = $pdo->prepare('DELETE FROM seturl_pending WHERE user_id = ?');
+    $st->execute([$chatId]);
+}
+
+/**
+ * Пригодна ли строка как SEARCH_URL: только http/https с реальным хостом
+ * и без переводов строк (иначе в .env попадёт чужая команда).
+ */
+function looksLikeSearchUrl(string $text): bool
+{
+    if ($text === '' || preg_match('/[\r\n]/', $text) === 1) {
+        return false;
+    }
+
+    $scheme = strtolower((string) parse_url($text, PHP_URL_SCHEME));
+    $host = strtolower((string) parse_url($text, PHP_URL_HOST));
+
+    return in_array($scheme, ['http', 'https'], true)
+        && $host !== ''
+        && str_contains($host, '.');
+}
+
+/** Пишет/заменяет строку SEARCH_URL в .env. true — запись прошла. */
+function saveSearchUrl(string $url, ?string $envPath = null): bool
+{
+    $path = $envPath ?? dirname(__DIR__) . '/.env';
+    $line = 'SEARCH_URL="' . addcslashes($url, "\\\"") . '"';
+
+    $content = is_file($path) ? file_get_contents($path) : '';
+    if ($content === false) {
+        return false;
+    }
+
+    $updated = preg_replace_callback(
+        '/^SEARCH_URL=.*$/m',
+        static fn (): string => $line,
+        $content,
+        1,
+        $count
+    );
+
+    if ($updated === null) {
+        return false;
+    }
+
+    if ($count === 0) {
+        $updated = ($content === '' ? '' : rtrim($content) . "\n") . $line . "\n";
+    }
+
+    return file_put_contents($path, $updated, LOCK_EX) !== false;
+}
+
+/** Обработка вставленной после /seturl ссылки. true — ответ уже отправлен. */
+function handleSetUrlInput(int $chatId, string $text): bool
+{
+    if (!looksLikeSearchUrl($text) || !saveSearchUrl($text)) {
+        sendText($chatId, SETURL_FAIL);
+        tgLog('seturl: неудача user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
+
+        return true;
+    }
+
+    disarmSetUrl($chatId);
+    sendText($chatId, SETURL_OK);
+    tgLog('seturl: сохранено user_id=' . $chatId . ' url=' . mb_substr($text, 0, 120));
+
+    return true;
+}
+
 function handleUpdate(array $message): void
 {
     $chat = $message['chat'] ?? [];
@@ -101,7 +203,18 @@ function handleUpdate(array $message): void
             unsubscribe((int) $chatId);
             break;
 
+        case '/seturl':
+            armSetUrl((int) $chatId);
+            sendText((int) $chatId, SETURL_PROMPT);
+            tgLog('seturl: жду ссылку user_id=' . $chatId);
+            break;
+
         default:
+            if (isSetUrlArmed((int) $chatId)) {
+                handleSetUrlInput((int) $chatId, $text);
+                break;
+            }
+
             sendText((int) $chatId, HELP_TEXT);
             tgLog('прочее сообщение user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
     }

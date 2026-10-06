@@ -39,32 +39,10 @@ $pdo = new PDO(
     ]
 );
 
-$pdo->exec(
-    'CREATE TABLE IF NOT EXISTS lots (
-        lot_number  VARCHAR(16) NOT NULL PRIMARY KEY,
-        vin         VARCHAR(32) NULL,
-        year        SMALLINT NULL,
-        make        VARCHAR(64) NULL,
-        model       VARCHAR(128) NULL,
-        body_style  VARCHAR(64) NULL,
-        engine      VARCHAR(64) NULL,
-        drive       VARCHAR(64) NULL,
-        fuel        VARCHAR(32) NULL,
-        damage      VARCHAR(128) NULL,
-        location    VARCHAR(64) NULL,
-        odometer    INT NULL,
-        buy_it_now_price INT NULL,
-        item_url    VARCHAR(255) NULL,
-        trim        JSON NULL,
-        color       JSON NULL,
-        transmission JSON NULL,
-        build_sheet JSON NULL,
-        full_model_name JSON NULL,
-        estimated_retail_value JSON NULL,
-        images      JSON NULL,
-        added_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
-);
+// Общая схема (lots + send_at + subscribers) — в schema.php
+require_once __DIR__ . '/schema.php';
+
+ensureSchema($pdo);
 
 $scalar = [
     'vin', 'year', 'make', 'model', 'body_style', 'engine', 'drive',

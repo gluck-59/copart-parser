@@ -4,3 +4,5 @@ cookies.json
 *.log
 .DS_Store
 .idea/
+# токен бота, секрет вебхука и доступ к БД — вне репозитория
+token.php

@@ -4,6 +4,31 @@
 
 A scraper for [copart.com](https://www.copart.com). Opens a real browser, intercepts API requests with your search filters, and collects all matching lots into a JSON file.
 
+Запуск локально:
+
+     docker compose run --rm copart-parser    # сбор
+     docker compose up -d                     # БД и PHP
+     docker compose down                     # остановить 
+
+## Подключение к БД (Sequel Ace / любой MySQL-клиент)
+
+| Параметр | Значение      |
+|----------|---------------|
+| Тип      | Standard (TCP/IP) |
+| Host     | `localhost`   |
+| Port     | `3306`        |
+| User     | `root` (или `copart_parser`) |
+| Password | `changeme` (если `MYSQL_ROOT_PASSWORD` не задан в окружении) |
+| Database | `copart-parser` |
+
+Пароль в `.env` не хранится — он задаётся переменной окружения `MYSQL_ROOT_PASSWORD` при запуске (по умолчанию `changeme`).
+
+Проверка из терминала:
+
+     docker compose ps          # copart-mysql должен быть healthy
+     nc -z localhost 3306       # TCP-порт открыт
+
+
 Use cases:
 
 - analyzing salvage car prices

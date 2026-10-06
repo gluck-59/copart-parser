@@ -972,7 +972,7 @@ async function fetchLotImages(page, lot, capturedLotImagesUrl) {
       const urls = parseLotImagesResponse(resp.data);
       if (urls && urls.length > 0) return urls;
     } else {
-      console.log(`[images] ${url.slice(21)} → ${resp.status}${resp.incapsula ? " (Incapsula)" : ""}`);
+      // console.log(`[images] ${url.slice(21)} → ${resp.status}${resp.incapsula ? " (Incapsula)" : ""}`);
     }
   }
   return null;
@@ -1043,6 +1043,13 @@ async function fetchLotDetails(page, lotNumber, capturedLotDetailsUrl, capturedL
   return record;
 }
 
+function logLot(lot, message) {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  const stamp = `${p(d.getDate())}-${p(d.getMonth() + 1)}-${String(d.getFullYear()).slice(2)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  console.log(`${stamp} ${lot} ${message}`);
+}
+
 async function main() {
   const session = await initCopartSession();
   const page = session.page;
@@ -1076,7 +1083,7 @@ async function main() {
       limit(async () => {
         await sleep(randomBetween(200, 500));
         try {
-          console.log(`Fetching details: ${lotNumber}`);
+          // console.log(`Fetching details: ${lotNumber}`);
           const details = await fetchLotDetails(
             page,
             lotNumber,
@@ -1085,10 +1092,11 @@ async function main() {
             imagesLimit
           );
           completed += 1;
-          console.log(`Progress: ${completed}/${lots.length}`);
+          // console.log(`Progress: ${completed}/${lots.length}`);
+          logLot(lotNumber, "успешно");
           return details;
         } catch (err) {
-          console.warn(`Failed lot ${lotNumber}: ${err.message}`);
+          logLot(lotNumber, err.message);
           return null;
         }
       })

@@ -44,11 +44,10 @@ function buildDigestRichMessage(array $lots): string
     $count = count($lots);
 
     return ''
-        . '<h2>Новые лоты Copart</h2>'
-        . '<p>Найдено лотов: ' . $count . '</p>'
+        . '<h3>Новых лотов: '. $count . ' </h3>'
         . '<table bordered striped>'
         . '<tr>'
-        . '<th>Лот</th><th>Машина</th><th>BIN</th>'
+        . '<th>Ссылка</th><th>Машина</th><th>BIN</th>'
         . '</tr>'
         . $rows
         . '</table>';

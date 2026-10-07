@@ -24,8 +24,14 @@ function ensureSchema(PDO $pdo): void
             drive       VARCHAR(64) NULL,
             fuel        VARCHAR(32) NULL,
             damage      VARCHAR(128) NULL,
+            secondary_damage VARCHAR(128) NULL,
+            title_type  VARCHAR(64) NULL,
+            has_keys    VARCHAR(16) NULL,
+            current_bid INT NULL,
+            currency    VARCHAR(8) NULL,
             location    VARCHAR(64) NULL,
             odometer    INT NULL,
+            odometer_unit VARCHAR(8) NULL,
             buy_it_now_price INT NULL,
             item_url    VARCHAR(255) NULL,
             trim        JSON NULL,
@@ -60,6 +66,12 @@ function ensureSchema(PDO $pdo): void
 
     addColumnIfMissing($pdo, 'lots', 'send_at', 'DATETIME NULL');
     addColumnIfMissing($pdo, 'lots', 'raw', 'LONGTEXT NULL');
+    addColumnIfMissing($pdo, 'lots', 'secondary_damage', 'VARCHAR(128) NULL');
+    addColumnIfMissing($pdo, 'lots', 'title_type', 'VARCHAR(64) NULL');
+    addColumnIfMissing($pdo, 'lots', 'has_keys', 'VARCHAR(16) NULL');
+    addColumnIfMissing($pdo, 'lots', 'current_bid', 'INT NULL');
+    addColumnIfMissing($pdo, 'lots', 'currency', 'VARCHAR(8) NULL');
+    addColumnIfMissing($pdo, 'lots', 'odometer_unit', 'VARCHAR(8) NULL');
 }
 
 /** Идемпотентное добавление колонки в существующую таблицу. */

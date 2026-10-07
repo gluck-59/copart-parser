@@ -29,7 +29,9 @@ $subscribers = $pdo
 
 $lots = $pdo
     ->query(
-        'SELECT lot_number, make, model, year, buy_it_now_price, item_url, images
+        'SELECT lot_number, make, model, year, buy_it_now_price, item_url, images,
+                odometer, odometer_unit, damage, secondary_damage, title_type,
+                has_keys, current_bid, currency, location
            FROM lots
           WHERE send_at IS NULL
           ORDER BY added_at, lot_number'

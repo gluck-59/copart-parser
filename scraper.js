@@ -6,45 +6,93 @@ import { spawn } from "node:child_process";
 import pLimit from "p-limit";
 import { chromium } from "playwright";
 
-// Загружаем .env из корня проекта. Реальные переменные окружения имеют приоритет над файлом.
-try {
-  process.loadEnvFile?.();
-} catch {
-  // .env отсутствует — используются значения по умолчанию ниже.
+// Реальные переменные окружения имеют приоритет над .env.
+const realEnv = { ...process.env };
+
+// Читаем .env из корня проекта. Вызывается перед каждым прогоном (main),
+// чтобы правки .env применялись без пересборки образа.
+function loadEnv() {
+  let content;
+  try {
+    content = fsSync.readFileSync(path.resolve(".env"), "utf8");
+  } catch {
+    return;
+  }
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (Object.prototype.hasOwnProperty.call(realEnv, key)) continue;
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
 }
 
 // const BASE_URL = "https://www.copart.com";
-const BASE_URL = process.env.BASE_URL || "https://www.copart.com";
-const BASE_HOST = new URL(BASE_URL).host;
-const BASE_DOMAIN = BASE_HOST.replace(/^www\./, "");
+let BASE_URL = process.env.BASE_URL || "https://www.copart.com";
+let BASE_HOST = new URL(BASE_URL).host;
+let BASE_DOMAIN = BASE_HOST.replace(/^www\./, "");
 const OUTPUT_DIR = path.resolve("output");
-const OUTPUT_FILE = process.env.OUTPUT_FILE
+let OUTPUT_FILE = process.env.OUTPUT_FILE
   ? path.resolve(process.env.OUTPUT_FILE)
   : path.join(OUTPUT_DIR, "copart_cars.json");
 
 
-const TARGET_LOTS = Number(process.env.TARGET_LOTS || 5000); // 5000
-const CONCURRENCY = Number(process.env.CONCURRENCY || 15);
-const SEARCH_MAX_PAGES = Number(process.env.SEARCH_MAX_PAGES || 300);
-const SEARCH_STALL_PAGES = Number(process.env.SEARCH_STALL_PAGES || 12);
-const HEADLESS = process.env.HEADLESS === "true";
-const SESSION_WAIT_MS = Number(process.env.SESSION_WAIT_MS || 15000);
+let TARGET_LOTS = Number(process.env.TARGET_LOTS || 5000); // 5000
+let CONCURRENCY = Number(process.env.CONCURRENCY || 15);
+let SEARCH_MAX_PAGES = Number(process.env.SEARCH_MAX_PAGES || 300);
+let SEARCH_STALL_PAGES = Number(process.env.SEARCH_STALL_PAGES || 12);
+let HEADLESS = process.env.HEADLESS === "true";
+let SESSION_WAIT_MS = Number(process.env.SESSION_WAIT_MS || 15000);
 // Прокси для браузерной сессии (поиск). Пусто — соединение напрямую. Формат: socks5://host:port
-const PROXY_URL = (process.env.PROXY_URL || "").trim();
+let PROXY_URL = (process.env.PROXY_URL || "").trim();
 // Настоящий Chrome вместо bundled Chromium. Incapsula отличает Playwright-запущенный
 // браузер по navigator.webdriver и режет API, поэтому в идеале ставим флаг false.
-const BROWSER_CHANNEL = (process.env.BROWSER_CHANNEL || "chrome").trim();
+let BROWSER_CHANNEL = (process.env.BROWSER_CHANNEL || "chrome").trim();
 // Дополнительные флаги запуска Chrome через пробел. Нужны в контейнере:
 // --no-sandbox (иначе не стартует от root), --disable-dev-shm-usage (/dev/shm в контейнере мал),
 // --renderer-process-limit=1 и лимит кучи режут память на слабом VPS.
-const CHROME_ARGS = (process.env.CHROME_ARGS || "").split(/\s+/).filter(Boolean);
+let CHROME_ARGS = (process.env.CHROME_ARGS || "").split(/\s+/).filter(Boolean);
 // Порт отладочного протокола для ручного запуска Chrome (connectOverCDP).
-const CDP_PORT = Number(process.env.CDP_PORT || 9333);
+let CDP_PORT = Number(process.env.CDP_PORT || 9333);
 // Экземпляр Chrome, который уже поднят сам скрипт (убивается в конце).
 let managedChrome = null;
 // Copart search URL with filters. The browser navigates here to capture the filtered API request.
-const SEARCH_URL = process.env.SEARCH_URL ||
+const DEFAULT_SEARCH_URL =
   "https://www.copart.com/lotSearchResults?free=false&displayStr=AUTOMOBILE,%5B0%20TO%2034800%5D,%5B2016%20TO%202027%5D&from=%2FvehicleFinder&fromSource=widget&qId=29c7ea24-cf30-4916-bf49-5f4a83ecc29e-1773432519447&searchCriteria=%7B%22query%22:%5B%22*%22%5D,%22filter%22:%7B%22VEHT%22:%5B%22vehicle_type_code:VEHTYPE_V%22%5D,%22TITL%22:%5B%22title_group_code:TITLEGROUP_C%22,%22title_group_code:TITLEGROUP_S%22%5D,%22PRID%22:%5B%22damage_type_code:DAMAGECODE_FR%22,%22damage_type_code:DAMAGECODE_HL%22,%22damage_type_code:DAMAGECODE_MC%22,%22damage_type_code:DAMAGECODE_MN%22,%22damage_type_code:DAMAGECODE_NW%22,%22damage_type_code:DAMAGECODE_RR%22,%22damage_type_code:DAMAGECODE_RO%22,%22damage_type_code:DAMAGECODE_SD%22,%22damage_type_code:DAMAGECODE_ST%22,%22damage_type_code:DAMAGECODE_TP%22,%22damage_type_code:DAMAGECODE_UN%22,%22damage_type_code:DAMAGECODE_VN%22%5D,%22ODM%22:%5B%22odometer_reading_received:%5B0%20TO%2092100%5D%22%5D,%22YEAR%22:%5B%22lot_year:%5B2010%20TO%202026%5D%22%5D%7D,%22searchName%22:%22%22,%22watchListOnly%22:false,%22freeFormSearch%22:false%7D";
+let SEARCH_URL = process.env.SEARCH_URL || DEFAULT_SEARCH_URL;
+
+// Перечитываем конфиг из process.env (после loadEnv).
+function readConfig() {
+  BASE_URL = process.env.BASE_URL || "https://www.copart.com";
+  BASE_HOST = new URL(BASE_URL).host;
+  BASE_DOMAIN = BASE_HOST.replace(/^www\./, "");
+  OUTPUT_FILE = process.env.OUTPUT_FILE
+    ? path.resolve(process.env.OUTPUT_FILE)
+    : path.join(OUTPUT_DIR, "copart_cars.json");
+  TARGET_LOTS = Number(process.env.TARGET_LOTS || 5000);
+  CONCURRENCY = Number(process.env.CONCURRENCY || 15);
+  SEARCH_MAX_PAGES = Number(process.env.SEARCH_MAX_PAGES || 300);
+  SEARCH_STALL_PAGES = Number(process.env.SEARCH_STALL_PAGES || 12);
+  HEADLESS = process.env.HEADLESS === "true";
+  SESSION_WAIT_MS = Number(process.env.SESSION_WAIT_MS || 15000);
+  PROXY_URL = (process.env.PROXY_URL || "").trim();
+  BROWSER_CHANNEL = (process.env.BROWSER_CHANNEL || "chrome").trim();
+  CHROME_ARGS = (process.env.CHROME_ARGS || "").split(/\s+/).filter(Boolean);
+  CDP_PORT = Number(process.env.CDP_PORT || 9333);
+  SEARCH_URL = process.env.SEARCH_URL || DEFAULT_SEARCH_URL;
+}
+
+loadEnv();
+readConfig();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -389,10 +437,16 @@ function mapLotDetails(rawDetails, lotNumber) {
       ? `$${Number(toNumber(estimatedRetail)).toLocaleString("en-US")}`
       : null,
     odometer: toNumber(findFirstKeyValue(rawDetails, ["odometer", "orr", "ord", "odometerReading", "odometer_reading"])),
+    odometer_unit: findFirstKeyValue(rawDetails, ["ouom", "odometerUnit", "odometer_unit"]) || null,
     damage:
       findFirstKeyValue(rawDetails, ["damage_description", "dd", "damageDescription", "damage", "primaryDamage", "primary_damage"]) ||
       findFirstKeyValue(rawDetails, ["secondary_damage", "secondaryDamage"]) ||
       null,
+    secondary_damage: findFirstKeyValue(rawDetails, ["sdd", "secondary_damage", "secondaryDamage"]) || null,
+    title_type: findFirstKeyValue(rawDetails, ["sttd", "titleType", "title_type"]) || null,
+    has_keys: findFirstKeyValue(rawDetails, ["hk", "hasKeys", "keys"]) || null,
+    current_bid: toNumber(findFirstKeyValue(rawDetails, ["currentBid", "hb", "highBid", "current_bid"])),
+    currency: findFirstKeyValue(rawDetails, ["cuc", "currency"]) || null,
     location: buildLocation(rawDetails),
     images: extractImages(rawDetails),
   };
@@ -419,7 +473,13 @@ function normalizeCarRecord(record) {
     estimated_retail_value: record?.estimated_retail_value ?? null,
     estimated_retail_value_formatted: record?.estimated_retail_value_formatted ?? null,
     odometer: record?.odometer ?? null,
+    odometer_unit: record?.odometer_unit ?? null,
     damage: record?.damage ?? null,
+    secondary_damage: record?.secondary_damage ?? null,
+    title_type: record?.title_type ?? null,
+    has_keys: record?.has_keys ?? null,
+    current_bid: record?.current_bid ?? null,
+    currency: record?.currency ?? null,
     location: record?.location ?? null,
     images: Array.isArray(record?.images) ? record.images : [],
     raw_data: record?.raw_data ?? null,
@@ -900,6 +960,9 @@ function logLot(lot, message) {
 }
 
 async function main() {
+  loadEnv();
+  readConfig();
+
   const session = await initCopartSession();
   const page = session.page;
 

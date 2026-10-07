@@ -48,7 +48,9 @@ ensureSchema($pdo);
 
 $scalar = [
     'vin', 'year', 'make', 'model', 'body_style', 'engine', 'drive',
-    'fuel', 'damage', 'location', 'odometer', 'buy_it_now_price', 'item_url',
+    'fuel', 'damage', 'secondary_damage', 'title_type', 'has_keys',
+    'current_bid', 'currency', 'location', 'odometer', 'odometer_unit',
+    'buy_it_now_price', 'item_url',
 ];
 $jsonCols = [
     'trim', 'color', 'transmission', 'build_sheet', 'full_model_name',

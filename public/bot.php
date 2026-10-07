@@ -17,19 +17,30 @@ require_once __DIR__ . '/../schema.php';
 
 define('WEBHOOK_URL', 'https://copart.opengluck.ru/bot.php');
 
-const HELP_TEXT = 'Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу раз в сутки по ссылке, которую вы покажете мне позднее.\n".
-    "<a href="http://t.me/motokofr">Мой автор Глюкъ</a> будет благодарен за пару ящиков вкусного темного.';
+const HELP_TEXT =
+    '<p>Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу раз в сутки по ссылке, которую вы покажете мне позднее.</p>'
+    . '<footer><a href="https://t.me/motokofr">Мой автор Глюкъ</a> будет благодарен за пару ящиков вкусного темного.</footer>';
 
 const SETURL_PROMPT =
     'Установите фильтры на Копарте, запустите поиск и проверьте. Если все ок, скопируйте ссылку из браузера и вставьте ее сюда.';
 const SETURL_OK = '✅ Фильтры сохранены, следующая партия лотов прилетит по расписанию.';
-const SETURL_FAIL = '⚠️ Что-то пошло не так, пожалуйтесь <a href="http://t.me/motokofr">Глюку</a>.';
+const SETURL_FAIL = '⚠️ Что-то пошло не так, пожалуйтесь <a href="https://t.me/motokofr">Глюку</a>.';
 
 function sendText(int $chatId, string $text): void
 {
     apiRequestJson('sendMessage', [
-        'chat_id' => $chatId,
-        'text'    => $text,
+        'chat_id'              => $chatId,
+        'text'                 => $text,
+        'parse_mode'           => 'HTML',
+        'link_preview_options' => ['is_disabled' => true],
+    ]);
+}
+
+function sendRich(int $chatId, string $html): void
+{
+    apiRequestJson('sendRichMessage', [
+        'chat_id'      => $chatId,
+        'rich_message' => ['html' => $html],
     ]);
 }
 
@@ -57,7 +68,7 @@ function subscribe(int $chatId, array $from): void
         $chatId,
         $already
             ? 'Вы уже подписаны.'
-            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="http://t.me/motokofr" >с моим автором Глюком</a>.'
+            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором Глюком</a>.'
     );
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
@@ -214,8 +225,10 @@ function handleUpdate(array $message): void
             }
 
             $firstName = (string) ($message['from']['first_name'] ?? '');
-            $greeting = $firstName !== '' ? 'Привет ' . $firstName . "!\n" : '';
-            sendText((int) $chatId, $greeting . HELP_TEXT);
+            $greeting = $firstName !== ''
+                ? '<p>Привет, ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . '!</p>'
+                : '';
+            sendRich((int) $chatId, $greeting . HELP_TEXT);
             tgLog('прочее сообщение user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
     }
 }

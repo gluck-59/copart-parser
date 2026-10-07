@@ -44,6 +44,20 @@ function sendRich(int $chatId, string $html): void
     ]);
 }
 
+function setUrlPromptText(): string
+{
+    $searchUrl = trim((string) (getenv('SEARCH_URL') ?: ''));
+
+    if ($searchUrl === '') {
+        $baseUrl = trim((string) (getenv('BASE_URL') ?: 'https://www.copart.es'));
+        $prefix = 'Ссылка на поиск: ' . htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8');
+    } else {
+        $prefix = 'Текущий поиск: ' . htmlspecialchars($searchUrl, ENT_QUOTES, 'UTF-8');
+    }
+
+    return $prefix . "\n\n" . SETURL_PROMPT;
+}
+
 function subscribe(int $chatId, array $from): void
 {
     $pdo = db();
@@ -214,7 +228,7 @@ function handleUpdate(array $message): void
 
         case '/seturl':
             armSetUrl((int) $chatId);
-            sendText((int) $chatId, SETURL_PROMPT);
+            sendText((int) $chatId, setUrlPromptText());
             tgLog('seturl: жду ссылку user_id=' . $chatId);
             break;
 

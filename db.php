@@ -4,27 +4,19 @@ declare(strict_types=1);
 /**
  * Подключение к БД copart-parser.
  *
- * Порядок приоритета: переменная окружения (docker) -> token.php -> дефолт.
- * Пароль в репозиторий не кладётся: см. token.php (в .gitignore).
+ * Порядок приоритета: переменная окружения -> .env -> дефолт.
+ * Пароль в репозиторий не кладётся: см. .env (в .gitignore), .env.example — в git.
  */
+
+require_once __DIR__ . '/env.php';
 
 function dbConfig(): array
 {
-    $local = [];
-
-    $file = __DIR__ . '/token.php';
-    if (is_readable($file)) {
-        $cfg = require $file;
-        if (is_array($cfg) && isset($cfg['db']) && is_array($cfg['db'])) {
-            $local = $cfg['db'];
-        }
-    }
-
     return [
-        'host' => getenv('MYSQL_HOST') ?: ($local['host'] ?? 'mysql'),
-        'name' => getenv('MYSQL_DB') ?: ($local['name'] ?? 'copart-parser'),
-        'user' => getenv('MYSQL_USER') ?: ($local['user'] ?? 'root'),
-        'pass' => getenv('MYSQL_ROOT_PASSWORD') ?: ($local['pass'] ?? ''),
+        'host' => getenv('MYSQL_HOST') ?: 'mysql',
+        'name' => getenv('MYSQL_DB') ?: 'copart-parser',
+        'user' => getenv('MYSQL_USER') ?: 'root',
+        'pass' => getenv('MYSQL_ROOT_PASSWORD') ?: '',
     ];
 }
 

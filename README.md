@@ -21,7 +21,11 @@ A scraper for [copart.com](https://www.copart.com). Opens a real browser, interc
 | Password | `changeme` (если `MYSQL_ROOT_PASSWORD` не задан в окружении) |
 | Database | `copart-parser` |
 
-Пароль в `.env` не хранится — он задаётся переменной окружения `MYSQL_ROOT_PASSWORD` при запуске (по умолчанию `changeme`).
+Пароль хранится в `.env` (в git кладётся только `.env.example`):
+
+     cp .env.example .env      # затем вписать секреты: токен бота, пароль MySQL
+
+Compose подставляет `MYSQL_ROOT_PASSWORD` из `.env` в контейнер MySQL при запуске.
 
 Проверка из терминала:
 

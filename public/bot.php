@@ -256,7 +256,7 @@ if (TG_WEBHOOK_SECRET !== '') {
         exit;
     }
 } else {
-    tgLog('webhook: webhook_secret не задан в token.php — проверка не выполняется');
+    tgLog('webhook: webhook_secret не задан в .env — проверка не выполняется');
 }
 
 $update = json_decode((string) file_get_contents('php://input'), true);

@@ -6,6 +6,8 @@ declare(strict_types=1);
  * Каждая строка — upsert по lot_number, added_at не меняется.
  */
 
+require_once __DIR__ . '/env.php';
+
 $host   = getenv('MYSQL_HOST') ?: 'mysql';
 $dbname = getenv('MYSQL_DB') ?: 'copart-parser';
 $user   = getenv('MYSQL_USER') ?: 'root';

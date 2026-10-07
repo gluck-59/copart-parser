@@ -6,44 +6,32 @@ declare(strict_types=1);
  * Паттерн повторяет synonim_bot: apiRequest (GET) + apiRequestJson (POST JSON).
  */
 
-function tgConfigPath(): string
-{
-    return __DIR__ . '/token.php';
-}
+require_once __DIR__ . '/env.php';
 
-function tgLoadConfig(): array
+/**
+ * Секреты (TG_BOT_TOKEN, TG_WEBHOOK_SECRET) живут в .env.
+ * .env.example без секретов лежит в git, сам .env — в .gitignore.
+ */
+function tgMissingEnv(string $name): never
 {
-    $path = tgConfigPath();
+    $msg = 'telegram_api: переменная ' . $name . " не задана в .env\n";
 
-    if (!is_readable($path)) {
-        $msg = 'telegram_api: не найден конфиг ' . basename($path) . "\n";
-        if (PHP_SAPI === 'cli') {
-            fwrite(STDERR, $msg);
-            exit(1);
-        }
-        http_response_code(500);
-        exit('bot config is missing');
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, $msg);
+        exit(1);
     }
 
-    $cfg = require $path;
-
-    if (!is_array($cfg) || empty($cfg['bot_token'])) {
-        $msg = 'telegram_api: в ' . basename($path) . " не задан bot_token\n";
-        if (PHP_SAPI === 'cli') {
-            fwrite(STDERR, $msg);
-            exit(1);
-        }
-        http_response_code(500);
-        exit('bot token is missing');
-    }
-
-    return $cfg;
+    http_response_code(500);
+    exit('bot config is missing');
 }
 
-$tgCfg = tgLoadConfig();
+$botToken = (string) (getenv('TG_BOT_TOKEN') ?: '');
+if ($botToken === '') {
+    tgMissingEnv('TG_BOT_TOKEN');
+}
 
-define('TG_TOKEN', (string) $tgCfg['bot_token']);
-define('TG_WEBHOOK_SECRET', (string) ($tgCfg['webhook_secret'] ?? ''));
+define('TG_TOKEN', $botToken);
+define('TG_WEBHOOK_SECRET', (string) (getenv('TG_WEBHOOK_SECRET') ?: ''));
 define('API_URL', 'https://api.telegram.org/bot' . TG_TOKEN . '/');
 
 /**

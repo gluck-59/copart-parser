@@ -52,8 +52,10 @@ $scalar = [
 ];
 $jsonCols = [
     'trim', 'color', 'transmission', 'build_sheet', 'full_model_name',
-    'estimated_retail_value', 'images',
+    'estimated_retail_value', 'images', 'raw',
 ];
+// В JSON-файле сырой объект лежит под ключом raw_data, в БД — колонка raw
+$jsonAliases = ['raw' => 'raw_data'];
 
 $cols = array_merge(['lot_number'], $scalar, $jsonCols);
 $placeholders = rtrim(str_repeat('?,', count($cols)), ',');
@@ -90,7 +92,8 @@ foreach ($data as $i => $row) {
     }
 
     foreach ($jsonCols as $c) {
-        $v = $row[$c] ?? null;
+        $src = $jsonAliases[$c] ?? $c;
+        $v = $row[$src] ?? null;
         if ($v === null || $v === '') {
             $values[] = null;
         } else {

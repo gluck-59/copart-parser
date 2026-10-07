@@ -25,7 +25,6 @@ const OUTPUT_FILE = process.env.OUTPUT_FILE
 
 const TARGET_LOTS = Number(process.env.TARGET_LOTS || 5000); // 5000
 const CONCURRENCY = Number(process.env.CONCURRENCY || 15);
-const IMAGES_CONCURRENCY = Number(process.env.IMAGES_CONCURRENCY || 2);
 const SEARCH_MAX_PAGES = Number(process.env.SEARCH_MAX_PAGES || 300);
 const SEARCH_STALL_PAGES = Number(process.env.SEARCH_STALL_PAGES || 12);
 const HEADLESS = process.env.HEADLESS === "true";
@@ -262,35 +261,6 @@ function normalizeImageUrl(url) {
   return null;
 }
 
-// Extract the unique image hash (UUID) from a Copart image URL
-function imageHash(url) {
-  const m = url.match(/\/([0-9a-f]{20,})_(?:v?ful|v?hrs|v?thb)\./i);
-  return m ? m[1] : null;
-}
-
-// Deduplicate images: one _ful URL per unique hash; fall back to any URL if hash not found
-function deduplicateImagesByHash(urls) {
-  const seen = new Map(); // hash → url
-  const noHash = [];
-  for (const url of urls) {
-    const h = imageHash(url);
-    if (!h) {
-      noHash.push(url);
-      continue;
-    }
-    if (seen.has(h)) {
-      // Prefer _ful over _hrs
-      const existing = seen.get(h);
-      if (url.includes("_ful.") && !existing.includes("_ful.")) {
-        seen.set(h, url);
-      }
-      continue;
-    }
-    seen.set(h, url);
-  }
-  return [...seen.values(), ...noHash];
-}
-
 function isActualImageUrl(url) {
   if (!url) return false;
   if (API_ENDPOINT_RE.test(url)) return false;
@@ -452,6 +422,7 @@ function normalizeCarRecord(record) {
     damage: record?.damage ?? null,
     location: record?.location ?? null,
     images: Array.isArray(record?.images) ? record.images : [],
+    raw_data: record?.raw_data ?? null,
   };
 }
 
@@ -851,67 +822,6 @@ function buildLotDetailsCandidates(lotNumber, capturedTemplateUrl) {
   return unique(urls);
 }
 
-function extractImageUrlsFromList(list) {
-  if (!Array.isArray(list)) return [];
-  return list
-    .flatMap((item) => {
-      if (typeof item === "string") return [normalizeImageUrl(item)];
-      if (!item || typeof item !== "object") return [];
-      // Prefer fullUrl (Copart API field), then other known fields
-      const specific = [
-        item?.fullUrl, item?.fullImageUrl, item?.url, item?.imageUrl,
-        item?.highResUrl, item?.highRes, item?.src, item?.imageLink,
-        item?.imageSrc, item?.image, item?.photo, item?.link,
-        item?.filePath, item?.imageFile,
-      ].map(normalizeImageUrl).filter(Boolean);
-      // If we found specific fields, use only those (avoids pulling thumbnails from generic scan)
-      if (specific.length > 0) return specific;
-      const any = Object.values(item)
-        .filter((v) => typeof v === "string")
-        .map(normalizeImageUrl)
-        .filter((u) => u && isActualImageUrl(u));
-      return any;
-    })
-    .filter((u) => u && isActualImageUrl(u));
-}
-
-function parseLotImagesResponse(data) {
-  if (!data) return null;
-  // Unwrap common envelope layers
-  const candidates = [data, data?.data, data?.data?.data, data?.result, data?.response].filter(Boolean);
-  for (const payload of candidates) {
-    for (const key of ["imagesList", "images", "imageList", "lotImages", "photos", "imageUrls", "imgList", "pictureList"]) {
-      const val = payload?.[key];
-      if (!val) continue;
-      // Handle { content: [...] } wrapper (Copart lotImages API returns imagesList.content)
-      const list = Array.isArray(val) ? val : Array.isArray(val?.content) ? val.content : null;
-      if (list && list.length > 0) {
-        const urls = extractImageUrlsFromList(list);
-        if (urls.length > 0) return urls;
-      }
-    }
-    if (Array.isArray(payload) && payload.length > 0) {
-      const urls = extractImageUrlsFromList(payload);
-      if (urls.length > 0) return urls;
-    }
-  }
-  // Last resort: scan all string values in the response for image URLs
-  const allUrls = [];
-  const scan = (obj) => {
-    if (!obj || typeof obj !== "object") return;
-    for (const v of Object.values(obj)) {
-      if (typeof v === "string") {
-        const u = normalizeImageUrl(v);
-        if (u && isActualImageUrl(u)) allUrls.push(u);
-      } else if (typeof v === "object") {
-        scan(v);
-      }
-    }
-  };
-  scan(data);
-  return allUrls.length > 0 ? unique(allUrls) : null;
-}
-
 // Запрос идёт изнутри страницы браузера: он несёт свои cookies и заголовки,
   // поэтому Incapsula отвечает данными, а не челленджем.
 async function fetchJsonInPage(page, url, method = "GET", body = null) {
@@ -940,45 +850,7 @@ async function fetchJsonInPage(page, url, method = "GET", body = null) {
   }
 }
 
-function buildLotImagesCandidates(lot, capturedLotImagesUrl) {
-  const patchCapturedUrl = (tmpl) => {
-    if (!tmpl) return null;
-    let u = tmpl
-      .replace(/\/lots\/\d+\//, `/lots/${lot}/`)
-      .replace(/\/\d{6,}\/images/, `/${lot}/images`)
-      .replace(/\/\d{6,}$/, `/${lot}`);
-    if (u === tmpl || u.endsWith("/")) u = u.replace(/\/?$/, `/${lot}`);
-    return u;
-  };
-
-  return unique([
-    patchCapturedUrl(capturedLotImagesUrl),
-    `${BASE_URL}/public/data/lotdetails/solr/lot-images/${lot}/ESP`,
-    `${BASE_URL}/public/data/lotdetails/solr/lot-images/${lot}`,
-    `${BASE_URL}/public/data/lotdetails/solr/lotNumber/${lot}/images`,
-    `${BASE_URL}/public/lots/${lot}/images`,
-    `${BASE_URL}/public/data/lotdetails/imagepaths/${lot}`,
-    `${BASE_URL}/public/data/lotimages/${lot}`,
-  ].filter(Boolean));
-}
-
-async function fetchLotImages(page, lot, capturedLotImagesUrl) {
-  const candidates = buildLotImagesCandidates(lot, capturedLotImagesUrl);
-
-  for (const url of candidates) {
-    const resp = await fetchJsonInPage(page, url);
-    if (!resp) continue;
-    if (resp.ok) {
-      const urls = parseLotImagesResponse(resp.data);
-      if (urls && urls.length > 0) return urls;
-    } else {
-      // console.log(`[images] ${url.slice(21)} → ${resp.status}${resp.incapsula ? " (Incapsula)" : ""}`);
-    }
-  }
-  return null;
-}
-
-async function fetchLotDetails(page, lotNumber, capturedLotDetailsUrl, capturedLotImagesUrl, imagesLimit) {
+async function fetchLotDetails(page, lotNumber, capturedLotDetailsUrl) {
   const lot = String(lotNumber);
   // Primary source: full lot object cached from search results
   const cachedLotData = lotDataCache.get(lot) || null;
@@ -998,13 +870,7 @@ async function fetchLotDetails(page, lotNumber, capturedLotDetailsUrl, capturedL
     return null;
   };
 
-  const [inspectionData, lotImagesList] = await Promise.all([
-    fetchInspectionData(),
-    imagesLimit(async () => {
-      await sleep(randomBetween(300, 600));
-      return fetchLotImages(page, lot, capturedLotImagesUrl);
-    }),
-  ]);
+  const inspectionData = await fetchInspectionData();
 
   if (!cachedLotData && !inspectionData) {
     throw new Error(`No data available for lot ${lot}`);
@@ -1015,30 +881,13 @@ async function fetchLotDetails(page, lotNumber, capturedLotDetailsUrl, capturedL
 
   const record = normalizeCarRecord(mapLotDetails(merged, lot));
 
-  // Merge additional images from the lot images API (full gallery)
-  if (lotImagesList && lotImagesList.length > 0) {
-    const extraUrls = lotImagesList
-      .flatMap((item) => {
-        if (typeof item === "string") return [normalizeImageUrl(item)];
-        return [
-          normalizeImageUrl(item?.url || item?.imageUrl || item?.src),
-          normalizeImageUrl(item?.fullImageUrl),
-          normalizeImageUrl(item?.highRes),
-        ];
-      })
-      .filter((u) => u && isActualImageUrl(u));
-
-    const combined = unique([...record.images, ...extraUrls]);
-    record.images = combined;
-  }
-
-  // Upgrade thumbnails to full-size: _thb → _ful
-  record.images = record.images.map((url) =>
+  // Галерею не тянем: храним только первое фото (из данных поиска/деталей)
+  record.images = (record.images || []).slice(0, 1).map((url) =>
     url.includes("_thb.") ? url.replace(/_thb\./, "_ful.") : url
   );
 
-  // Deduplicate by image hash — keep one _ful URL per unique image, drop _hrs duplicates
-  record.images = deduplicateImagesByHash(record.images);
+  // Полный сырой объект (search + details) — сохраняем без потерь
+  record.raw_data = merged;
 
   return record;
 }
@@ -1076,7 +925,6 @@ async function main() {
     }
 
     const limit = pLimit(CONCURRENCY);
-    const imagesLimit = pLimit(IMAGES_CONCURRENCY);
     let completed = 0;
 
     const tasks = lots.map((lotNumber) =>
@@ -1087,9 +935,7 @@ async function main() {
           const details = await fetchLotDetails(
             page,
             lotNumber,
-            session.capturedLotDetailsUrl,
-            session.capturedLotImagesUrl,
-            imagesLimit
+            session.capturedLotDetailsUrl
           );
           completed += 1;
           // console.log(`Progress: ${completed}/${lots.length}`);

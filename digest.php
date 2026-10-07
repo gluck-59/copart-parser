@@ -25,20 +25,30 @@ function buildDigestRichMessage(array $lots): string
         }
 
         $url = trim((string) ($lot['item_url'] ?? ''));
-        $cellNumber = $url !== ''
-            ? '<a href="' . $escape($url) . '">' . $escape($number) . '</a>'
-            : $escape($number);
-
         $year = $lot['year'] ?? null;
         $price = $lot['buy_it_now_price'] ?? null;
 
+        $carInfo = $url !== ''
+            ? '<a href="' . $escape($url) . '">'
+            . $escape($lot['make'] ?? null) . '&nbsp' . $escape($lot['model'] ?? null) . '&nbsp'.($year !== null ? $escape((string) $year) : '')
+            . '</a>'
+            : $escape($number);
+
         $rows .= '<tr>'
-            . '<td>' . $cellNumber . '</td>'
-            . '<td>' . $escape($lot['make'] ?? null) . '<br>'
-            . $escape($lot['model'] ?? null) . '<br>'
-            . ($year !== null ? $escape((string) $year) : '') . '</td>'
-            . '<td>' . ($price !== null ? $escape((string) $price) : '—') . '</td>'
-            . '</tr>';
+            . '<td>' . 'ФОТО №1'.'</td>'
+            . '<td>' . $price .'</td>';
+        
+        $rows .= $carInfo;
+        
+        $rows .= '</tr>';
+
+//        $rows .= '<tr>'
+//            . '<td>' . $carInfo . '</td>'
+//            . '<td>' . $escape($lot['make'] ?? null) . '&nbsp'
+//            . $escape($lot['model'] ?? null) . '&nbsp'
+//            . ($year !== null ? $escape((string) $year) : '') . '</td>'
+//            . '<td>' . ($price !== null ? $escape((string) $price) : '—') . '</td>'
+//            . '</tr>';
     }
 
     $count = count($lots);

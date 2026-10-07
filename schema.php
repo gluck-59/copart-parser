@@ -58,19 +58,20 @@ function ensureSchema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
-    addSendAtColumn($pdo);
+    addColumnIfMissing($pdo, 'lots', 'send_at', 'DATETIME NULL');
+    addColumnIfMissing($pdo, 'lots', 'raw', 'LONGTEXT NULL');
 }
 
-/** Миграция уже существующей таблицы lots: колонка send_at. */
-function addSendAtColumn(PDO $pdo): void
+/** Идемпотентное добавление колонки в существующую таблицу. */
+function addColumnIfMissing(PDO $pdo, string $table, string $column, string $definition): void
 {
     $st = $pdo->prepare(
         'SELECT COUNT(*) FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
     );
-    $st->execute(['lots', 'send_at']);
+    $st->execute([$table, $column]);
 
     if ((int) $st->fetchColumn() === 0) {
-        $pdo->exec('ALTER TABLE lots ADD COLUMN send_at DATETIME NULL');
+        $pdo->exec("ALTER TABLE $table ADD COLUMN $column $definition");
     }
 }

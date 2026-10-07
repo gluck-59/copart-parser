@@ -27,6 +27,11 @@ $subscribers = $pdo
     ->query('SELECT user_id, first_name, username FROM subscribers ORDER BY subscribed_at, user_id')
     ->fetchAll();
 
+$digestLimit = (int) (getenv('DIGEST_LIMIT') ?: 3);
+if ($digestLimit < 1) {
+    $digestLimit = 3;
+}
+
 $lots = $pdo
     ->query(
         'SELECT lot_number, make, model, year, buy_it_now_price, item_url, images,
@@ -34,7 +39,8 @@ $lots = $pdo
                 has_keys, current_bid, currency, location
            FROM lots
           WHERE send_at IS NULL
-          ORDER BY added_at, lot_number'
+          ORDER BY added_at, lot_number
+          LIMIT ' . $digestLimit
     )
     ->fetchAll();
 

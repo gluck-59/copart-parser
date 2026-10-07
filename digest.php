@@ -34,9 +34,9 @@ function buildDigestRichMessage(array $lots): string
 
         $rows .= '<tr>'
             . '<td>' . $cellNumber . '</td>'
-            . '<td>' . $escape($lot['make'] ?? null) . '</td>'
-            . '<td>' . $escape($lot['model'] ?? null) . '</td>'
-            . '<td>' . ($year !== null ? $escape((string) $year) : '—') . '</td>'
+            . '<td>' . $escape($lot['make'] ?? null) . '<br>'
+            . $escape($lot['model'] ?? null) . '<br>'
+            . ($year !== null ? $escape((string) $year) : '') . '</td>'
             . '<td>' . ($price !== null ? $escape((string) $price) : '—') . '</td>'
             . '</tr>';
     }
@@ -48,7 +48,7 @@ function buildDigestRichMessage(array $lots): string
         . '<p>Найдено лотов: ' . $count . '</p>'
         . '<table bordered striped>'
         . '<tr>'
-        . '<th>Лот</th><th>Марка</th><th>Модель</th><th>Год</th><th>Цена</th>'
+        . '<th>Лот</th><th>Машина</th><th>BIN</th>'
         . '</tr>'
         . $rows
         . '</table>';

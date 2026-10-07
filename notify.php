@@ -29,7 +29,7 @@ $subscribers = $pdo
 
 $lots = $pdo
     ->query(
-        'SELECT lot_number, make, model, year, buy_it_now_price, item_url
+        'SELECT lot_number, make, model, year, buy_it_now_price, item_url, images
            FROM lots
           WHERE send_at IS NULL
           ORDER BY added_at, lot_number'

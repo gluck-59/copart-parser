@@ -213,7 +213,9 @@ function handleUpdate(array $message): void
                 break;
             }
 
-            sendText((int) $chatId, HELP_TEXT);
+            $firstName = (string) ($message['from']['first_name'] ?? '');
+            $greeting = $firstName !== '' ? 'Привет ' . $firstName . "!\n" : '';
+            sendText((int) $chatId, $greeting . HELP_TEXT);
             tgLog('прочее сообщение user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
     }
 }

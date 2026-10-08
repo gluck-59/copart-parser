@@ -68,6 +68,17 @@ function buildDigestRichMessage(array $lots): string
 
         $lines = [$link];
 
+        $auctionMs = $lot['auction_ms'] ?? null;
+        if ($auctionMs !== null && $auctionMs !== '') {
+            $seconds = intdiv((int) $auctionMs, 1000);
+            if ($seconds > 0) {
+                $auctionDate = (new DateTimeImmutable('@' . $seconds))
+                    ->setTimezone(new DateTimeZone('Europe/Madrid'))
+                    ->format('d.m.Y');
+                $lines[] = 'Auction in ' . $auctionDate;
+            }
+        }
+
         if ($price !== null && (int) $price > 0) {
             $lines[] = 'BIN ' . $fmt($price) . ($cur !== '' ? ' ' . $cur : '');
         }

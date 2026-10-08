@@ -36,7 +36,8 @@ $lots = $pdo
     ->query(
         'SELECT lot_number, make, model, year, buy_it_now_price, item_url, images,
                 odometer, odometer_unit, damage, secondary_damage, title_type,
-                has_keys, current_bid, currency, location
+                has_keys, current_bid, currency, location,
+                JSON_EXTRACT(raw, \'$.ad\') AS auction_ms
            FROM lots
           WHERE send_at IS NULL
           ORDER BY added_at, lot_number

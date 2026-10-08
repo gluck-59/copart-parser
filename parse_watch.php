@@ -31,10 +31,48 @@ if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
     exit(1);
 }
 
-$digestLimit = (int) (getenv('DIGEST_LIMIT') ?: 20);
-//if ($digestLimit < 1) {
-//    $digestLimit = 3;
-//}
+/**
+ * Перечитывает .env заново (в отличие от env.php без статического guard)
+ * и перезаписывает переменные окружения. Вызывается перед каждым запуском
+ * парсера, чтобы правки .env применялись без перезапуска контейнера.
+ */
+function refreshEnv(): void
+{
+    $content = @file_get_contents(__DIR__ . '/.env');
+    if ($content === false) {
+        return;
+    }
+
+    foreach (preg_split('/\r\n|\r|\n/', $content) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+
+        $pos = strpos($line, '=');
+        if ($pos === false || $pos === 0) {
+            continue;
+        }
+
+        $name = trim(substr($line, 0, $pos));
+        if ($name === '' || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name) !== 1) {
+            continue;
+        }
+
+        $value = trim(substr($line, $pos + 1));
+        $len = strlen($value);
+        if ($len >= 2) {
+            $first = $value[0];
+            $last = $value[$len - 1];
+            if (($first === '"' || $first === "'") && $last === $first) {
+                $value = substr($value, 1, -1);
+            }
+        }
+
+        putenv($name . '=' . $value);
+        $_ENV[$name] = $value;
+    }
+}
 
 function pwSendText(int $chatId, string $text): void
 {
@@ -68,6 +106,10 @@ while (true) {
         sleep(5);
         continue;
     }
+
+    // Правки .env применяются перед каждым запуском парсера, без рестарта контейнера.
+    refreshEnv();
+    $digestLimit = (int) (getenv('DIGEST_LIMIT') ?: 20);
 
     tgLog('parse_watch: запуск сбора user_id=' . $chatId);
 

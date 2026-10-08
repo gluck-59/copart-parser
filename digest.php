@@ -108,7 +108,6 @@ function buildDigestRichMessage(array $lots): string
                 . '<img src="' . $escape($photo) . '"/>'
                 . '<figcaption>' . $caption . '</figcaption>'
                 . '</figure>'
-                . '<hr/><hr/>'
             ;
         } else {
             $cards .= '<p>' . $caption . '</p>';
@@ -117,6 +116,5 @@ function buildDigestRichMessage(array $lots): string
 
     return ''
         . '<h3>Новых: ' . $count . '</h3>'
-        . $cards
-        . '<hr/>';
+        . $cards;
 }

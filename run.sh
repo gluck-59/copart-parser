@@ -20,6 +20,23 @@ case "${ENVIROMENT:-}" in
     ;;
 esac
 
+# prod: контейнер вотчера создаём при первом запуске и поднимаем, если он down.
+ensure_runner() {
+  if docker inspect copart-parser-run >/dev/null 2>&1; then
+    docker restart copart-parser-run >/dev/null
+  else
+    docker run -d --name copart-parser-run --restart unless-stopped \
+      --network opengluck \
+      -e TZ=Europe/Moscow \
+      -v /var/www/copart-parser/output:/app/output \
+      -v /var/www/copart-parser/import.log:/app/import.log \
+      -v /var/www/copart-parser/bot.log:/app/bot.log \
+      -v /var/www/copart-parser/.env:/app/.env \
+      copart-parser:latest \
+      sh -c "node scraper.js && echo SCRAPER_DONE && php /app/parse_watch.php"
+  fi
+}
+
 case "${1:-}" in
   cycle)
     # a) парсинг + импорт в базу
@@ -28,7 +45,7 @@ case "${1:-}" in
       docker compose logs -f copart-parser
     else
       SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-      docker restart copart-parser-run
+      ensure_runner
       echo "run.sh: ждём завершения сбора (SCRAPER_DONE)..."
       done=0
       for _ in $(seq 1 120); do

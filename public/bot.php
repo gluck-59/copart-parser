@@ -19,12 +19,15 @@ define('WEBHOOK_URL', 'https://copart.opengluck.ru/bot.php');
 
 const HELP_TEXT =
     '<p>Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу раз в сутки по ссылке, которую вы покажете мне позднее.</p>'
-    . '<footer><a href="https://t.me/motokofr">Мой автор Глюкъ</a> будет благодарен за пару ящиков вкусного темного.</footer>';
+    . '<footer><a href="https://t.me/motokofr">Мой автор</a> будет благодарен за пару ящиков вкусного темного.</footer>';
 
 const SETURL_PROMPT =
-    'Установите фильтры на Копарте, запустите поиск и проверьте. Если все ок, скопируйте ссылку из браузера и вставьте ее сюда.';
+    'Измените фильтры на Копарте, запустите поиск и проверьте. Если все ок, скопируйте ссылку из браузера и вставьте ее сюда.';
 const SETURL_OK = '✅ Фильтры сохранены, следующая партия лотов прилетит по расписанию.';
-const SETURL_FAIL = '⚠️ Что-то пошло не так, пожалуйтесь <a href="https://t.me/motokofr">Глюку</a>.';
+const SETURL_FAIL = '⚠️ Что-то пошло не так, пожалуйтесь <a href="https://t.me/motokofr">моему автору</a>.';
+
+const PARSE_STARTED_TEXT = 'Поиск начался, он займет от нескольких секунд до нескольких минут. Я пришлю вам лоты если они найдутся.';
+const PARSE_FAIL_TEXT = '⚠️ Не удалось запустить поиск, попробуйте позже.';
 
 function sendText(int $chatId, string $text): void
 {
@@ -58,6 +61,17 @@ function setUrlPromptText(): string
     return $prefix . "\n\n" . SETURL_PROMPT;
 }
 
+/** Заявка на внеплановый поиск: пишем триггер-файл для раннера. */
+function requestParse(int $chatId): void
+{
+    $trigger = dirname(__DIR__) . '/output/parse.request';
+
+    $ok = @file_put_contents($trigger, (string) $chatId, LOCK_EX) !== false;
+
+    sendText($chatId, $ok ? PARSE_STARTED_TEXT : PARSE_FAIL_TEXT);
+    tgLog('parse: ' . ($ok ? 'заявка' : 'не удалось записать триггер') . ' user_id=' . $chatId);
+}
+
 function subscribe(int $chatId, array $from): void
 {
     $pdo = db();
@@ -82,7 +96,7 @@ function subscribe(int $chatId, array $from): void
         $chatId,
         $already
             ? 'Вы уже подписаны.'
-            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором Глюком</a>.'
+            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.'
     );
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
@@ -230,6 +244,10 @@ function handleUpdate(array $message): void
             armSetUrl((int) $chatId);
             sendText((int) $chatId, setUrlPromptText());
             tgLog('seturl: жду ссылку user_id=' . $chatId);
+            break;
+
+        case '/parse':
+            requestParse((int) $chatId);
             break;
 
         default:

@@ -58,11 +58,17 @@ function ensureSchema(PDO $pdo): void
 
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS seturl_pending (
+            id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id      BIGINT NOT NULL,
+            url          VARCHAR(2048) NULL,
             requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id)
+            PRIMARY KEY (id),
+            KEY idx_user (user_id),
+            KEY idx_requested (requested_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    migrateSeturlPending($pdo);
 
     addColumnIfMissing($pdo, 'lots', 'send_at', 'DATETIME NULL');
     addColumnIfMissing($pdo, 'lots', 'raw', 'LONGTEXT NULL');
@@ -77,13 +83,57 @@ function ensureSchema(PDO $pdo): void
 /** Идемпотентное добавление колонки в существующую таблицу. */
 function addColumnIfMissing(PDO $pdo, string $table, string $column, string $definition): void
 {
+    if (!columnExists($pdo, $table, $column)) {
+        $pdo->exec("ALTER TABLE $table ADD COLUMN $column $definition");
+    }
+}
+
+/** Есть ли колонка в таблице текущей БД. */
+function columnExists(PDO $pdo, string $table, string $column): bool
+{
     $st = $pdo->prepare(
         'SELECT COUNT(*) FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
     );
     $st->execute([$table, $column]);
 
-    if ((int) $st->fetchColumn() === 0) {
-        $pdo->exec("ALTER TABLE $table ADD COLUMN $column $definition");
+    return (int) $st->fetchColumn() > 0;
+}
+
+/** Есть ли индекс в таблице текущей БД. */
+function indexExists(PDO $pdo, string $table, string $index): bool
+{
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.STATISTICS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+    );
+    $st->execute([$table, $index]);
+
+    return (int) $st->fetchColumn() > 0;
+}
+
+/**
+ * Миграция seturl_pending к виду: id AUTO_INCREMENT PK, user_id больше не уникален.
+ * Старое представление: PRIMARY KEY(user_id). Новое: id PK + url + индексы.
+ */
+function migrateSeturlPending(PDO $pdo): void
+{
+    if (!columnExists($pdo, 'seturl_pending', 'id')) {
+        if (indexExists($pdo, 'seturl_pending', 'PRIMARY')) {
+            $pdo->exec('ALTER TABLE seturl_pending DROP PRIMARY KEY');
+        }
+        $pdo->exec(
+            'ALTER TABLE seturl_pending
+             ADD COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST'
+        );
+    }
+
+    addColumnIfMissing($pdo, 'seturl_pending', 'url', 'VARCHAR(2048) NULL');
+
+    if (!indexExists($pdo, 'seturl_pending', 'idx_user')) {
+        $pdo->exec('ALTER TABLE seturl_pending ADD INDEX idx_user (user_id)');
+    }
+    if (!indexExists($pdo, 'seturl_pending', 'idx_requested')) {
+        $pdo->exec('ALTER TABLE seturl_pending ADD INDEX idx_requested (requested_at)');
     }
 }

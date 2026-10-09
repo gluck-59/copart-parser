@@ -17,6 +17,8 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/schema.php';
 require_once __DIR__ . '/telegram_api.php';
 require_once __DIR__ . '/digest.php';
+require_once __DIR__ . '/messages.php';
+require_once __DIR__ . '/search_url.php';
 
 chdir(__DIR__);
 
@@ -111,9 +113,17 @@ while (true) {
     refreshEnv();
     $digestLimit = (int) (getenv('DIGEST_LIMIT') ?: 20);
 
+    $searchUrl = latestSearchUrl($pdo);
+    if ($searchUrl === null) {
+        pwSendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+        tgLog('parse_watch: ссылка поиска не задана user_id=' . $chatId);
+        sleep(5);
+        continue;
+    }
+
     tgLog('parse_watch: запуск сбора user_id=' . $chatId);
 
-    exec('node scraper.js >> import.log 2>&1', $out, $scrapeCode);
+    exec('node scraper.js ' . escapeshellarg($searchUrl) . ' >> import.log 2>&1', $out, $scrapeCode);
 
     if ($scrapeCode !== 0) {
         pwSendText($chatId, 'Не удалось выполнить поиск, попробуйте позже.');

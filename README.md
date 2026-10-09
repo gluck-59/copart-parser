@@ -70,12 +70,12 @@ Results are saved to `output/copart_cars.json`.
 
 ## Search filters
 
-By default the script uses the search URL hardcoded in `scraper.js` (line 25). This is a link from your Copart search with all your selected filters applied.
+By default the script uses the search URL passed as the first argument (`node scraper.js "<url>"`). The bot stores the latest `/seturl` link in the database and passes it to the scraper. Without an argument it falls back to the URL hardcoded in `scraper.js` (`DEFAULT_SEARCH_URL`).
 
-To change the filters — open the desired search on copart.com, copy the URL from the address bar, and replace the `SEARCH_URL` value in the script (or pass it as an environment variable):
+To change the filters — run `/seturl` in Telegram or open the desired search on copart.com, copy the URL from the address bar, and pass it to the script:
 
 ```bash
-SEARCH_URL="https://www.copart.com/lotSearchResults?..." node scraper.js
+node scraper.js "https://www.copart.com/lotSearchResults?..."
 ```
 
 ## Configuration
@@ -89,7 +89,6 @@ All parameters can be overridden via environment variables:
 | `HEADLESS`        | `false` | `true` — run browser without UI (background mode)        |
 | `SESSION_WAIT_MS` | `15000` | Wait time after browser opens (ms) before scraping       |
 | `OUTPUT_FILE`     | —       | Output file path (default: `output/copart_cars.json`)    |
-| `SEARCH_URL`      | —       | Search URL with filters (overrides the one in the script)|
 
 Example — collect 1000 lots in background mode:
 

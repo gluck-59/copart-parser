@@ -68,7 +68,7 @@ let managedChrome = null;
 // Copart search URL with filters. The browser navigates here to capture the filtered API request.
 const DEFAULT_SEARCH_URL =
   "https://www.copart.com/lotSearchResults?free=false&displayStr=AUTOMOBILE,%5B0%20TO%2034800%5D,%5B2016%20TO%202027%5D&from=%2FvehicleFinder&fromSource=widget&qId=29c7ea24-cf30-4916-bf49-5f4a83ecc29e-1773432519447&searchCriteria=%7B%22query%22:%5B%22*%22%5D,%22filter%22:%7B%22VEHT%22:%5B%22vehicle_type_code:VEHTYPE_V%22%5D,%22TITL%22:%5B%22title_group_code:TITLEGROUP_C%22,%22title_group_code:TITLEGROUP_S%22%5D,%22PRID%22:%5B%22damage_type_code:DAMAGECODE_FR%22,%22damage_type_code:DAMAGECODE_HL%22,%22damage_type_code:DAMAGECODE_MC%22,%22damage_type_code:DAMAGECODE_MN%22,%22damage_type_code:DAMAGECODE_NW%22,%22damage_type_code:DAMAGECODE_RR%22,%22damage_type_code:DAMAGECODE_RO%22,%22damage_type_code:DAMAGECODE_SD%22,%22damage_type_code:DAMAGECODE_ST%22,%22damage_type_code:DAMAGECODE_TP%22,%22damage_type_code:DAMAGECODE_UN%22,%22damage_type_code:DAMAGECODE_VN%22%5D,%22ODM%22:%5B%22odometer_reading_received:%5B0%20TO%2092100%5D%22%5D,%22YEAR%22:%5B%22lot_year:%5B2010%20TO%202026%5D%22%5D%7D,%22searchName%22:%22%22,%22watchListOnly%22:false,%22freeFormSearch%22:false%7D";
-let SEARCH_URL = process.env.SEARCH_URL || DEFAULT_SEARCH_URL;
+let SEARCH_URL = (process.argv[2] || DEFAULT_SEARCH_URL).trim();
 
 // Перечитываем конфиг из process.env (после loadEnv).
 function readConfig() {
@@ -88,7 +88,7 @@ function readConfig() {
   BROWSER_CHANNEL = (process.env.BROWSER_CHANNEL || "chrome").trim();
   CHROME_ARGS = (process.env.CHROME_ARGS || "").split(/\s+/).filter(Boolean);
   CDP_PORT = Number(process.env.CDP_PORT || 9333);
-  SEARCH_URL = process.env.SEARCH_URL || DEFAULT_SEARCH_URL;
+  SEARCH_URL = (process.argv[2] || DEFAULT_SEARCH_URL).trim();
 }
 
 loadEnv();

@@ -14,17 +14,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/../telegram_api.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../schema.php';
+require_once __DIR__ . '/../messages.php';
+require_once __DIR__ . '/../search_url.php';
 
 define('WEBHOOK_URL', 'https://copart.opengluck.ru/bot.php');
 
 const HELP_TEXT =
     '<p>Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу раз в сутки по ссылке, которую вы покажете мне позднее.</p>'
     . '<footer><a href="https://t.me/motokofr">Мой автор</a> будет благодарен за пару ящиков вкусного темного.</footer>';
-
-const SETURL_PROMPT =
-    'Измените фильтры на Копарте, запустите поиск и проверьте. Если все ок, скопируйте ссылку из браузера и вставьте ее сюда.';
-const SETURL_OK = '✅ Фильтры сохранены, следующая партия лотов прилетит по расписанию.';
-const SETURL_FAIL = '⚠️ Что-то пошло не так, пожалуйтесь <a href="https://t.me/motokofr">моему автору</a>.';
 
 const PARSE_STARTED_TEXT = 'Поиск начался, он займет от нескольких секунд до нескольких минут. Я пришлю вам лоты если они найдутся.';
 const PARSE_FAIL_TEXT = '⚠️ Не удалось запустить поиск, попробуйте позже.';
@@ -49,14 +46,11 @@ function sendRich(int $chatId, string $html): void
 
 function setUrlPromptText(): string
 {
-    $searchUrl = trim((string) (getenv('SEARCH_URL') ?: ''));
+    $searchUrl = latestSearchUrl(db());
 
-    if ($searchUrl === '') {
-        $baseUrl = trim((string) (getenv('BASE_URL') ?: 'https://www.copart.es'));
-        $prefix = 'Ссылка на поиск: ' . htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8');
-    } else {
-        $prefix = 'Текущий поиск: ' . htmlspecialchars($searchUrl, ENT_QUOTES, 'UTF-8');
-    }
+    $prefix = $searchUrl !== null
+        ? 'Текущий поиск: ' . htmlspecialchars($searchUrl, ENT_QUOTES, 'UTF-8')
+        : NO_FILTERS_TEXT;
 
     return $prefix . "\n\n" . SETURL_PROMPT;
 }
@@ -101,7 +95,7 @@ function subscribe(int $chatId, array $from): void
             ? 'Вы уже подписаны.'
             : 'Привет '.$first_name.'! '.HELP_TEXT
     );
-    sendText($chatId, 'Ваша подписка оформлена. Я буду присылать вам новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а изменить ыильтры поиска — через меню.');
+    sendText($chatId, 'Ваша подписка оформлена. Я буду присылать вам новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а изменить фильтры поиска — через меню.');
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
 }
 
@@ -119,16 +113,14 @@ function unsubscribe(int $chatId): void
     tgLog('отписка user_id=' . $chatId . ($removed ? '' : ' (нет подписки)'));
 }
 
-/** Запоминаем, что от user_id ждём ссылку на поиск Copart. */
+/** Запоминаем, что от user_id ждём ссылку на поиск Copart (маркер: url IS NULL). */
 function armSetUrl(int $chatId): void
 {
     $pdo = db();
     ensureSchema($pdo);
 
-    $pdo->prepare(
-        'INSERT INTO seturl_pending (user_id) VALUES (?)
-         ON DUPLICATE KEY UPDATE requested_at = CURRENT_TIMESTAMP'
-    )->execute([$chatId]);
+    $pdo->prepare('INSERT INTO seturl_pending (user_id, url) VALUES (?, NULL)')
+        ->execute([$chatId]);
 }
 
 function isSetUrlArmed(int $chatId): bool
@@ -136,24 +128,15 @@ function isSetUrlArmed(int $chatId): bool
     $pdo = db();
     ensureSchema($pdo);
 
-    $st = $pdo->prepare('SELECT 1 FROM seturl_pending WHERE user_id = ?');
+    $st = $pdo->prepare('SELECT 1 FROM seturl_pending WHERE user_id = ? AND url IS NULL LIMIT 1');
     $st->execute([$chatId]);
 
     return (bool) $st->fetchColumn();
 }
 
-function disarmSetUrl(int $chatId): void
-{
-    $pdo = db();
-    ensureSchema($pdo);
-
-    $st = $pdo->prepare('DELETE FROM seturl_pending WHERE user_id = ?');
-    $st->execute([$chatId]);
-}
-
 /**
- * Пригодна ли строка как SEARCH_URL: только http/https с реальным хостом
- * и без переводов строк (иначе в .env попадёт чужая команда).
+ * Пригодна ли строка как ссылка поиска: только http/https с реальным хостом
+ * и без переводов строк.
  */
 function looksLikeSearchUrl(string $text): bool
 {
@@ -169,47 +152,31 @@ function looksLikeSearchUrl(string $text): bool
         && str_contains($host, '.');
 }
 
-/** Пишет/заменяет строку SEARCH_URL в .env. true — запись прошла. */
-function saveSearchUrl(string $url, ?string $envPath = null): bool
+/** Сохраняет валидную ссылку в маркер ожидания (url IS NULL → url). true — запись прошла. */
+function saveSearchUrl(int $chatId, string $url): bool
 {
-    $path = $envPath ?? dirname(__DIR__) . '/.env';
-    $line = 'SEARCH_URL="' . addcslashes($url, "\\\"") . '"';
+    $pdo = db();
+    ensureSchema($pdo);
 
-    $content = is_file($path) ? file_get_contents($path) : '';
-    if ($content === false) {
-        return false;
-    }
-
-    $updated = preg_replace_callback(
-        '/^SEARCH_URL=.*$/m',
-        static fn (): string => $line,
-        $content,
-        1,
-        $count
+    $st = $pdo->prepare(
+        'UPDATE seturl_pending SET url = ?, requested_at = NOW()
+          WHERE user_id = ? AND url IS NULL'
     );
+    $st->execute([$url, $chatId]);
 
-    if ($updated === null) {
-        return false;
-    }
-
-    if ($count === 0) {
-        $updated = ($content === '' ? '' : rtrim($content) . "\n") . $line . "\n";
-    }
-
-    return file_put_contents($path, $updated, LOCK_EX) !== false;
+    return $st->rowCount() > 0;
 }
 
 /** Обработка вставленной после /seturl ссылки. true — ответ уже отправлен. */
 function handleSetUrlInput(int $chatId, string $text): bool
 {
-    if (!looksLikeSearchUrl($text) || !saveSearchUrl($text)) {
+    if (!looksLikeSearchUrl($text) || !saveSearchUrl($chatId, $text)) {
         sendText($chatId, SETURL_FAIL);
         tgLog('seturl: неудача user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
 
         return true;
     }
 
-    disarmSetUrl($chatId);
     sendText($chatId, SETURL_OK);
     tgLog('seturl: сохранено user_id=' . $chatId . ' url=' . mb_substr($text, 0, 120));
 

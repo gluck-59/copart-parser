@@ -98,8 +98,8 @@ function subscribe(int $chatId, array $from): void
         $chatId,
         $already
             ? 'Вы уже подписаны.'
-            : 'Привет ' . htmlspecialchars($first_name, ENT_QUOTES, 'UTF-8') . '!<br>'. HELP_TEXT.'<br>'
-            . 'Я буду присылать сюда новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а установить фильтр для поиска лотов — через меню.'
+            : 'Привет ' . htmlspecialchars($first_name, ENT_QUOTES, 'UTF-8') . '!<br>'. HELP_TEXT.'<br>
+            Я буду присылать сюда новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а установить фильтр для поиска лотов — через меню.'
     );
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));

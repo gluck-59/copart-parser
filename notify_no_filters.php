@@ -21,7 +21,7 @@ $subscribers = $pdo
     ->query('SELECT user_id FROM subscribers ORDER BY subscribed_at, user_id')
     ->fetchAll();
 
-$text = NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT;
+$text = NO_FILTERS_TEXT . "\n" . SETURL_PROMPT;
 
 $delivered = 0;
 

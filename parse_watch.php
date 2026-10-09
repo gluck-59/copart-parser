@@ -115,7 +115,7 @@ while (true) {
 
     $searchUrl = latestSearchUrl($pdo);
     if ($searchUrl === null) {
-        pwSendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+        pwSendText($chatId, NO_FILTERS_TEXT . "\n" . SETURL_PROMPT);
         tgLog('parse_watch: ссылка поиска не задана user_id=' . $chatId);
         sleep(5);
         continue;

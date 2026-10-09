@@ -59,7 +59,7 @@ function setUrlPromptText(): string
 function requestParse(int $chatId): void
 {
     if (latestSearchUrl(db()) === null) {
-        sendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+        sendText($chatId, NO_FILTERS_TEXT . "\n" . SETURL_PROMPT);
         tgLog('parse: ссылка поиска не задана user_id=' . $chatId);
         return;
     }
@@ -104,7 +104,7 @@ function subscribe(int $chatId, array $from): void
     sendText($chatId, 'Ваша подписка оформлена. Я буду присылать вам новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а изменить фильтры поиска — через меню.');
 
     if (latestSearchUrl($pdo) === null) {
-        sendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+        sendText($chatId, NO_FILTERS_TEXT . "\n" . SETURL_PROMPT);
     }
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
@@ -181,9 +181,16 @@ function saveSearchUrl(int $chatId, string $url): bool
 /** Обработка вставленной после /seturl ссылки. true — ответ уже отправлен. */
 function handleSetUrlInput(int $chatId, string $text): bool
 {
-    if (!looksLikeSearchUrl($text) || !saveSearchUrl($chatId, $text)) {
+    if (!looksLikeSearchUrl($text)) {
+        sendText($chatId, INVALID_URL);
+        tgLog('seturl: невалидная ссылка user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
+
+        return true;
+    }
+
+    if (!saveSearchUrl($chatId, $text)) {
         sendText($chatId, SETURL_FAIL);
-        tgLog('seturl: неудача user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
+        tgLog('seturl: неудача сохранения user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
 
         return true;
     }

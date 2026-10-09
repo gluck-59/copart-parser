@@ -119,6 +119,7 @@ function buildDigestRichMessage(array $lots): string
                 . '<img src="' . $escape($photo) . '"/>'
                 . '<figcaption>' . $caption . '</figcaption>'
                 . '</figure>'
+                .'<hr/>'
             ;
         } else {
             $cards .= '<p>' . $caption . '</p>';

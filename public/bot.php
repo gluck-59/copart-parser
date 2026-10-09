@@ -92,11 +92,14 @@ function subscribe(int $chatId, array $from): void
         isset($from['username']) ? (string) $from['username'] : null,
     ]);
 
+    $firstName = (string) ($message['from']['first_name'] ?? '');
+
     sendText(
         $chatId,
         $already
             ? 'Вы уже подписаны.'
-            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.'
+            : 'Привет, ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . '!'
+            . 'Я буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.'
     );
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));

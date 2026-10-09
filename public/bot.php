@@ -99,6 +99,7 @@ function subscribe(int $chatId, array $from): void
             : HELP_TEXT
 //            : 'Подписка оформлена. Буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.'
     );
+    sendText($chatId, 'Ваша подписка оформлена. Я буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.');
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
 }

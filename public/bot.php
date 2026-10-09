@@ -58,6 +58,12 @@ function setUrlPromptText(): string
 /** Заявка на внеплановый поиск: пишем триггер-файл для раннера. */
 function requestParse(int $chatId): void
 {
+    if (latestSearchUrl(db()) === null) {
+        sendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+        tgLog('parse: ссылка поиска не задана user_id=' . $chatId);
+        return;
+    }
+
     $trigger = dirname(__DIR__) . '/output/parse.request';
 
     $ok = @file_put_contents($trigger, (string) $chatId, LOCK_EX) !== false;
@@ -96,6 +102,11 @@ function subscribe(int $chatId, array $from): void
             : 'Привет '.$first_name.'! '.HELP_TEXT
     );
     sendText($chatId, 'Ваша подписка оформлена. Я буду присылать вам новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а изменить фильтры поиска — через меню.');
+
+    if (latestSearchUrl($pdo) === null) {
+        sendText($chatId, NO_FILTERS_TEXT . "\n\n" . SETURL_PROMPT);
+    }
+
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));
 }
 

@@ -86,20 +86,20 @@ function subscribe(int $chatId, array $from): void
          VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE first_name = VALUES(first_name), username = VALUES(username)'
     );
+    $first_name = isset($from['first_name']) ? (string) $from['first_name'] : null;
+    $username = isset($from['username']) ? (string) $from['username'] : null;
     $st->execute([
         $chatId,
-        isset($from['first_name']) ? (string) $from['first_name'] : null,
-        isset($from['username']) ? (string) $from['username'] : null,
+        $first_name,
+        $username
     ]);
-
-    $firstName = (string) ($message['from']['first_name'] ?? '');
 
     sendText(
         $chatId,
         $already
             ? 'Вы уже подписаны.'
-            : 'Привет, ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . '!'
-            . 'Я буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>.'
+            : 'Привет ' . htmlspecialchars($first_name, ENT_QUOTES, 'UTF-8') . '!'
+            . 'Я буду присылать новые лоты по расписанию. Расписание можно обсудить <a href="https://t.me/motokofr">с моим автором</a>, а установить фильтр для поиска лотов — через меню.'
     );
 
     tgLog('подписка user_id=' . $chatId . ($already ? ' (повторно)' : ' (новая)'));

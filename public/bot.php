@@ -92,7 +92,7 @@ function subscribe(int $chatId, array $from): void
         isset($from['username']) ? (string) $from['username'] : null,
     ]);
 
-    sendText(
+    sendRich(
         $chatId,
         $already
             ? 'Вы уже подписаны.'

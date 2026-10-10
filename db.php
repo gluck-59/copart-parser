@@ -20,9 +20,13 @@ function dbConfig(): array
     ];
 }
 
-function db(): PDO
+function db(bool $fresh = false): PDO
 {
     static $pdo = null;
+
+    if ($fresh) {
+        $pdo = null;
+    }
 
     if ($pdo instanceof PDO) {
         return $pdo;

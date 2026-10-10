@@ -101,9 +101,9 @@ while (true) {
     }
 
     $chatId = (int) trim((string) file_get_contents($trigger));
-    @unlink($trigger);
 
     if ($chatId <= 0) {
+        @unlink($trigger);
         tgLog('parse_watch: пустой user_id в триггере');
         sleep(5);
         continue;
@@ -113,8 +113,21 @@ while (true) {
     refreshEnv();
     $digestLimit = (int) (getenv('DIGEST_LIMIT') ?: 20);
 
-    $searchUrl = latestSearchUrl($pdo);
+    // Долгоживущий процесс: берём свежее соединение перед каждой заявкой, иначе
+    // MySQL закрывает простаивавшее соединение (wait_timeout) и запрос падает с
+    // 2006 "MySQL server has gone away".
+    try {
+        $pdo = db(true);
+        ensureSchema($pdo);
+        $searchUrl = latestSearchUrl($pdo);
+    } catch (PDOException $e) {
+        tgLog('parse_watch: ошибка БД: ' . $e->getMessage());
+        sleep(5);
+        continue;
+    }
+
     if ($searchUrl === null) {
+        @unlink($trigger);
         pwSendText($chatId, NO_FILTERS_TEXT . "\n" . SETURL_PROMPT);
         tgLog('parse_watch: ссылка поиска не задана user_id=' . $chatId);
         sleep(5);
@@ -124,6 +137,10 @@ while (true) {
     tgLog('parse_watch: запуск сбора user_id=' . $chatId);
 
     exec('node scraper.js ' . escapeshellarg($searchUrl) . ' >> import.log 2>&1', $out, $scrapeCode);
+
+    // Заявку снимаем после любого ответа скрапера: обрыв до ответа оставляет
+    // триггер (повторится после рестарта), ответ получен — снимаем без ретраев.
+    @unlink($trigger);
 
     if ($scrapeCode !== 0) {
         pwSendText($chatId, 'Не удалось выполнить поиск, попробуйте позже.');

@@ -20,7 +20,7 @@ require_once __DIR__ . '/../search_url.php';
 define('WEBHOOK_URL', 'https://copart.opengluck.ru/bot.php');
 
 const HELP_TEXT =
-    '<p>Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу раз в сутки по ссылке, которую вы покажете мне позднее.</p>'
+    '<p>Я бот Копарс, умею парсить Копарт и присылать подходящие лоты в Телеграм. Подходящие ищу дважды в сутки по ссылке, которую вы покажете мне позднее.</p>'
     . '<footer><a href="https://t.me/motokofr">Мой автор</a> будет благодарен за пару ящиков вкусного темного.</footer>';
 
 const PARSE_STARTED_TEXT = 'Поиск начался, он займет от нескольких секунд до нескольких минут. Я пришлю вам лоты если они найдутся.';
@@ -277,7 +277,7 @@ function handleUpdate(array $message): void
 
             $firstName = (string) ($message['from']['first_name'] ?? '');
             $greeting = $firstName !== ''
-                ? '<p>Привет, ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . '!</p>'
+                ? '<p>Сорян, ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . ', я не понимаю произвольных сообщений.</p>'
                 : '';
             sendRich((int) $chatId, $greeting . HELP_TEXT);
             tgLog('прочее сообщение user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));

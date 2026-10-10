@@ -212,7 +212,8 @@ function saveSearchUrl(int $chatId, string $url): bool
 function handleSetUrlInput(int $chatId, string $text): bool
 {
     if (!looksLikeSearchUrl($text)) {
-        sendText($chatId, INVALID_URL);
+        sendText($chatId, NO_FILTERS_TEXT);
+        sendText($chatId, INVALID_URL . "\n" . SETURL_PROMPT);
         tgLog('seturl: невалидная ссылка user_id=' . $chatId . ' text=' . mb_substr($text, 0, 50));
 
         return true;

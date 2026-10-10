@@ -124,6 +124,36 @@ function unsubscribe(int $chatId): void
     tgLog('отписка user_id=' . $chatId . ($removed ? '' : ' (нет подписки)'));
 }
 
+/**
+ * Апдейт my_chat_member: изменение статуса бота в приватном чате.
+ * kicked — юзер заблокировал бота, left — покинул чат; в обоих случаях
+ * тихо снимаем подписку (писать юзеру нельзя — он ушёл/заблокировал).
+ */
+function handleMyChatMember(array $member): void
+{
+    $chat = $member['chat'] ?? [];
+
+    if (($chat['type'] ?? '') !== 'private') {
+        return;
+    }
+
+    $userId = (int) ($chat['id'] ?? 0);
+    $status = (string) ($member['new_chat_member']['status'] ?? '');
+
+    if ($userId <= 0 || !in_array($status, ['kicked', 'left'], true)) {
+        return;
+    }
+
+    $pdo = db();
+    ensureSchema($pdo);
+
+    $st = $pdo->prepare('DELETE FROM subscribers WHERE user_id = ?');
+    $st->execute([$userId]);
+    $removed = $st->rowCount() > 0;
+
+    tgLog('my_chat_member: ' . $status . ' user_id=' . $userId . ($removed ? ' (отписан)' : ' (нет подписки)'));
+}
+
 /** Запоминаем, что от user_id ждём ссылку на поиск Copart (маркер: url IS NULL). */
 function armSetUrl(int $chatId): void
 {
@@ -259,7 +289,7 @@ function handleUpdate(array $message): void
 if (!empty($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] === 'setWebhook') {
     $params = [
         'url'             => WEBHOOK_URL,
-        'allowed_updates' => ['message'],
+        'allowed_updates' => ['message', 'my_chat_member'],
     ];
 
     if (TG_WEBHOOK_SECRET !== '') {
@@ -294,10 +324,14 @@ if (TG_WEBHOOK_SECRET !== '') {
 
 $update = json_decode((string) file_get_contents('php://input'), true);
 
-if (!is_array($update) || !isset($update['message'])) {
-    // прочие апдейты игнорируем
+if (!is_array($update)) {
     exit;
 }
 
-handleUpdate($update['message']);
+if (isset($update['message'])) {
+    handleUpdate($update['message']);
+} elseif (isset($update['my_chat_member'])) {
+    handleMyChatMember($update['my_chat_member']);
+}
+
 exit;

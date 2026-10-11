@@ -193,17 +193,19 @@ function looksLikeSearchUrl(string $text): bool
         && str_contains($host, '.');
 }
 
-/** Сохраняет валидную ссылку в маркер ожидания (url IS NULL → url). true — запись прошла. */
+/**
+ * Сохраняет ссылку поиска. Таблица сжимается до одной строки: перед записью
+ * новой ссылки она очищается, поэтому актуальная ссылка всегда единственная.
+ */
 function saveSearchUrl(int $chatId, string $url): bool
 {
     $pdo = db();
     ensureSchema($pdo);
 
-    $st = $pdo->prepare(
-        'UPDATE seturl_pending SET url = ?, requested_at = NOW()
-          WHERE user_id = ? AND url IS NULL'
-    );
-    $st->execute([$url, $chatId]);
+    $pdo->exec('TRUNCATE TABLE seturl_pending');
+
+    $st = $pdo->prepare('INSERT INTO seturl_pending (user_id, url) VALUES (?, ?)');
+    $st->execute([$chatId, $url]);
 
     return $st->rowCount() > 0;
 }

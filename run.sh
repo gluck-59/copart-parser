@@ -75,8 +75,12 @@ case "${1:-}" in
     # b) рассылка
     "${PHP[@]}" "$PHP_DIR/notify.php"
     ;;
+  auto)
+    # c) автозапуск по расписанию: проверка ссылки и подписчиков + заявка на парсинг
+    "${PHP[@]}" "$PHP_DIR/search_url.php" auto
+    ;;
   *)
-    echo "usage: ./run.sh {cycle|notify}" >&2
+    echo "usage: ./run.sh {cycle|notify|auto}" >&2
     exit 1
     ;;
 esac

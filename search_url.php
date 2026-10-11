@@ -29,6 +29,38 @@ function latestSearchUrl(PDO $pdo): ?string
     return is_string($url) && $url !== '' ? $url : null;
 }
 
+/**
+ * Автоматический запуск парсинга (cron): проверяет ссылку и подписчиков,
+ * при их отсутствии выходит без парсинга, иначе создаёт триггер для parse_watch.
+ */
+function autoRequestParse(): void
+{
+    $pdo = db();
+    ensureSchema($pdo);
+
+    if (latestSearchUrl($pdo) === null) {
+        echo "auto: ссылка поиска не задана — пропуск\n";
+        return;
+    }
+
+    $subs = (int) $pdo->query('SELECT COUNT(*) FROM subscribers')->fetchColumn();
+
+    if ($subs === 0) {
+        echo "auto: подписчиков нет — пропуск\n";
+        return;
+    }
+
+    $ok = @file_put_contents(__DIR__ . '/output/parse.request', 'cron', LOCK_EX) !== false;
+
+    echo $ok
+        ? "auto: заявка создана (подписчиков {$subs})\n"
+        : "auto: не удалось записать триггер\n";
+}
+
 if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {
-    echo latestSearchUrl(db()) ?? '';
+    if (($argv[1] ?? '') === 'auto') {
+        autoRequestParse();
+    } else {
+        echo latestSearchUrl(db()) ?? '';
+    }
 }

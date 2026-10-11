@@ -127,6 +127,6 @@ function buildDigestRichMessage(array $lots): string
     }
 
     return ''
-        . '<h3>Новых: ' . $count . '</h3>'
+        . '<h3>Текущий поиск, новых ' . $count . '</h3>'
         . $cards;
 }

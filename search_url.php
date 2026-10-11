@@ -35,26 +35,28 @@ function latestSearchUrl(PDO $pdo): ?string
  */
 function autoRequestParse(): void
 {
+    $log = static fn (string $message): string => date('d.m.y H:i') . ' ' . $message . "\n";
+
     $pdo = db();
     ensureSchema($pdo);
 
     if (latestSearchUrl($pdo) === null) {
-        echo "auto: ссылка поиска не задана — пропуск\n";
+        echo $log('auto: ссылка поиска не задана — пропуск');
         return;
     }
 
     $subs = (int) $pdo->query('SELECT COUNT(*) FROM subscribers')->fetchColumn();
 
     if ($subs === 0) {
-        echo "auto: подписчиков нет — пропуск\n";
+        echo $log('auto: подписчиков нет — пропуск');
         return;
     }
 
     $ok = @file_put_contents(__DIR__ . '/output/parse.request', 'cron', LOCK_EX) !== false;
 
-    echo $ok
-        ? "auto: заявка создана (подписчиков {$subs})\n"
-        : "auto: не удалось записать триггер\n";
+    echo $log($ok
+        ? "auto: заявка создана (подписчиков {$subs})"
+        : 'auto: не удалось записать триггер');
 }
 
 if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {

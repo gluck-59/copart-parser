@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 const NO_FILTERS_TEXT = 'Фильтры для поиска не заданы.';
 
+const NO_NEW_LOTS_TEXT = 'Нет новых лотов.';
+
 const INVALID_URL = 'Некорректная ссылка на поиск Копарт. Нажмите "изменить фильтр поиска" еще раз и пришлите ссылку.';
 
 const SETURL_PROMPT =

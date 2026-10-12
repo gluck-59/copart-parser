@@ -11,6 +11,7 @@ declare(strict_types=1);
  * Логика:
  *   - берём лоты, у которых send_at IS NULL;
  *   - если подписчиков нет — лоты не отправляем и не помечаем;
+ *   - если новых лотов нет — шлём подписчикам NO_NEW_LOTS_TEXT и пишем в bot.log;
  *   - шлём один дайджест-Rich Message каждому подписчику;
  *   - при успешной доставке хотя бы одному подписчику помечаем лоты send_at = NOW().
  */
@@ -19,6 +20,7 @@ require_once __DIR__ . '/schema.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/telegram_api.php';
 require_once __DIR__ . '/digest.php';
+require_once __DIR__ . '/messages.php';
 
 $pdo = db();
 ensureSchema($pdo);
@@ -53,6 +55,40 @@ printf(
 
 if ($lots === []) {
     echo "notify: новых лотов нет\n";
+
+    if ($subscribers === []) {
+        echo "notify: подписчиков нет — уведомление не отправлялось\n";
+        exit(0);
+    }
+
+    $deliveredNone = 0;
+
+    foreach ($subscribers as $subscriber) {
+        $chatId = (int) $subscriber['user_id'];
+
+        $result = apiRequestJson('sendMessage', [
+            'chat_id'              => $chatId,
+            'text'                 => NO_NEW_LOTS_TEXT,
+            'parse_mode'           => 'HTML',
+            'link_preview_options' => ['is_disabled' => true],
+        ]);
+
+        if ($result !== false) {
+            $deliveredNone++;
+            tgLog("без новинок: уведомление доставлено user_id={$chatId}");
+        }
+    }
+
+    if ($deliveredNone === 0) {
+        fwrite(STDERR, "notify: 'нет новых лотов' не доставлено ни одному подписчику\n");
+        exit(1);
+    }
+
+    printf(
+        "notify: 'нет новых лотов' отправлено %d из %d подписчиков\n",
+        $deliveredNone,
+        count($subscribers)
+    );
     exit(0);
 }
 
